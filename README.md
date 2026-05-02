@@ -20,12 +20,12 @@
 
 **Apr 2026 Update**: Added the new [documentation website](https://sakanaai.github.io/ShinkaEvolve/) with guides for getting started, configuration, async evolution, local models, WebUI usage, and agentic workflows.
 
-**Mar 2026 Update**: Refactored API and unified runner `ShinkaEvolveRunner` (replacing `EvolutionRunner` and `AsyncEvolutionRunner`). You can now install `shinka` via PyPI and `uv`: `pip install shinka-evolve`.
+**Mar 2026 Update**: Refactored API and unified runner `ShinkaEvolveRunner` (replacing `EvolutionRunner` and `AsyncEvolutionRunner`). This fork should be installed from the forked repository so the agent CLI backend changes are included.
 
 **Feb 2026 Update**: Added [agent skills](https://sakanaai.github.io/ShinkaEvolve/agentic_usage/) for using `shinka` within coding agents (Claude Code, Codex, etc.) for new task generation ([`shinka-setup`](https://github.com/SakanaAI/ShinkaEvolve/blob/main/skills/shinka-setup/SKILL.md)), converting your repo ([`shinka-convert`](https://github.com/SakanaAI/ShinkaEvolve/blob/main/skills/shinka-convert/SKILL.md)),  evolution ([`shinka-run`](https://github.com/SakanaAI/ShinkaEvolve/blob/main/skills/shinka-run/SKILL.md)), and result inspection ([`shinka-inspect`](https://github.com/SakanaAI/ShinkaEvolve/blob/main/skills/shinka-inspect/SKILL.md)). Install them via `npx`:
 
 ```
-npx skills add SakanaAI/ShinkaEvolve --skill '*' -a claude-code -a codex -y
+npx skills add th2ch-g/ShinkaEvolve-noAPI --skill '*' -a claude-code -a codex -y
 ```
 
 **Jan 2026 Update**: ShinkaEvolve was accepted at ICLR 2026 and we [released an update](https://github.com/SakanaAI/ShinkaEvolve/blob/main/CHANGELOG.md) with new features.
@@ -55,17 +55,19 @@ The framework supports **parallel evaluation of candidates** locally or on a Slu
 ## Installation & Quick Start 🚀
 
 ```bash
-# Install from PyPI
-pip install shinka-evolve
+# Install this fork from source
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
+uv sync --dev
 
-# Or with uv
-uv pip install shinka-evolve
+# Or install the fork directly into an existing environment
+uv pip install "git+https://github.com/th2ch-g/ShinkaEvolve-noAPI.git"
 
 # Run your first evolution experiment
-shinka_launch variant=circle_packing_example
+uv run shinka_launch variant=circle_packing_example
 ```
 
-The distribution name is `shinka-evolve`; Python imports stay `import shinka`.
+The distribution name remains `shinka-evolve`; Python imports stay `import shinka`.
 
 `shinka_launch` still supports the original shorthand group overrides:
 
@@ -74,7 +76,7 @@ shinka_launch variant=circle_packing_example
 shinka_launch task=novelty_generator database=island_small
 ```
 
-Built-in Hydra presets ship inside the package under `shinka/configs/`. To add your own presets from a PyPI install without cloning the repo, place them in your own config directory and pass `--config-dir`:
+Built-in Hydra presets ship inside the package under `shinka/configs/`. To add your own presets from an installed package without cloning the repo, place them in your own config directory and pass `--config-dir`:
 
 ```bash
 mkdir -p ~/my-shinka-configs/variant
@@ -85,8 +87,8 @@ shinka_launch --config-dir ~/my-shinka-configs variant=my_variant
 For development installs from source:
 
 ```bash
-git clone https://github.com/SakanaAI/ShinkaEvolve
-cd ShinkaEvolve
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
 uv venv --python 3.11
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install -e .

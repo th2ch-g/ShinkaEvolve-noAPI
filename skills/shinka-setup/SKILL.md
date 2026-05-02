@@ -46,7 +46,7 @@ Invoke this skill when the user:
 ## What is ShinkaEvolve?
 A framework developed by SakanaAI that combines LLMs with evolutionary algorithms to propose program mutations, that are then evaluated and archived. The goal is to optimize for performance and discover novel scientific insights. 
 
-Repo and documentation: https://github.com/SakanaAI/ShinkaEvolve
+Repo and documentation: https://github.com/th2ch-g/ShinkaEvolve-noAPI
 Paper: https://arxiv.org/abs/2212.04180
 
 ### Evolution Flow
@@ -72,11 +72,13 @@ Install once before creating/running tasks:
 # Check if shinka is available in workspace environment
 python -c "import shinka"
 
-# If not; install from PyPI
-pip install shinka-evolve
+# If not, install this fork from source
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
+uv sync --dev
 
-# Or with uv
-uv pip install shinka-evolve
+# Or install the fork directly into an existing environment
+uv pip install "git+https://github.com/th2ch-g/ShinkaEvolve-noAPI.git"
 ```
 
 ## Language Support (`initial.<ext>`)

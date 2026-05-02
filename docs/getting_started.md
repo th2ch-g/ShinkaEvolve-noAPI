@@ -48,8 +48,8 @@ pip install uv
 #### Clone and install
 
 ```bash
-git clone <shinka-repository-url>
-cd ShinkaEvolve
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
 uv venv --python 3.11
 source .venv/bin/activate    # macOS/Linux
 # .venv\Scripts\activate     # Windows
@@ -61,8 +61,8 @@ uv pip install -e .
 ```bash
 conda create -n shinka python=3.11
 conda activate shinka
-git clone <shinka-repository-url>
-cd ShinkaEvolve
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
 pip install -e .
 ```
 
@@ -90,7 +90,7 @@ python -c "from shinka.core import ShinkaEvolveRunner; print('OK')"
 Install bundled Shinka skills for Claude Code or Codex:
 
 ```bash
-npx skills add SakanaAI/ShinkaEvolve --skill '*' -g -a claude-code -a codex -y
+npx skills add th2ch-g/ShinkaEvolve-noAPI --skill '*' -g -a claude-code -a codex -y
 ```
 
 See [Usage Guide](agentic_usage.md) for per-skill walkthroughs.

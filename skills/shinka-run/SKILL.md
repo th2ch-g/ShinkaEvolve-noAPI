@@ -18,7 +18,7 @@ Do not use this skill when:
 ## What is ShinkaEvolve?
 A framework developed by SakanaAI that combines LLMs with evolutionary algorithms to propose program mutations, that are then evaluated and archived. The goal is to optimize for performance and discover novel scientific insights. 
 
-Repo and documentation: https://github.com/SakanaAI/ShinkaEvolve
+Repo and documentation: https://github.com/th2ch-g/ShinkaEvolve-noAPI
 Paper: https://arxiv.org/abs/2212.04180
 
 ## Workflow

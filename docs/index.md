@@ -70,8 +70,10 @@ workflows.
 ## Quickstart
 
 ```bash
-pip install shinka-evolve
-shinka_launch variant=circle_packing_example
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
+uv sync --dev
+uv run shinka_launch variant=circle_packing_example
 ```
 
 The distribution name is `shinka-evolve`; the import path is `import shinka`.

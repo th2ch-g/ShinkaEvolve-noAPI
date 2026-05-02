@@ -18,10 +18,12 @@ It covers:
 From a clean machine:
 
 ```bash
-pip install shinka-evolve
+git clone https://github.com/th2ch-g/ShinkaEvolve-noAPI.git
+cd ShinkaEvolve-noAPI
+uv sync --dev
 
-# or
-uv pip install shinka-evolve
+# or install the fork directly into an existing environment
+uv pip install "git+https://github.com/th2ch-g/ShinkaEvolve-noAPI.git"
 ```
 
 Set API keys (example):
@@ -56,7 +58,7 @@ The Shinka skills live directly in this repo under `skills/`. You do not need to
 Install all current Shinka skills globally for Claude Code and Codex:
 
 ```bash
-npx skills add SakanaAI/ShinkaEvolve --skill '*' -g -a claude-code -a codex -y
+npx skills add th2ch-g/ShinkaEvolve-noAPI --skill '*' -g -a claude-code -a codex -y
 ```
 
 This installs from the GitHub repo source. The explicit `--skill '*'` makes "install all skills" unambiguous and avoids interactive prompts.
@@ -73,7 +75,7 @@ Installed skills currently include:
 Use this if you want the skills installed only for the current repo:
 
 ```bash
-npx skills add SakanaAI/ShinkaEvolve --skill '*' -a claude-code -a codex -y
+npx skills add th2ch-g/ShinkaEvolve-noAPI --skill '*' -a claude-code -a codex -y
 ```
 
 Typical project paths:
@@ -93,7 +95,7 @@ For the global install command above, the relevant skill roots are:
 For a narrower install:
 
 ```bash
-npx skills add SakanaAI/ShinkaEvolve --skill shinka-setup -g -a claude-code -a codex -y
+npx skills add th2ch-g/ShinkaEvolve-noAPI --skill shinka-setup -g -a claude-code -a codex -y
 ```
 
 ## 4) Setup Skill Walkthrough (`shinka-setup`)
