@@ -56,6 +56,18 @@ shinka_run \
   --num_generations 20
 ```
 
+### Agent CLI backend
+
+Use a logged-in Codex or Claude Code CLI without provider API keys:
+
+```bash
+shinka_run \
+  --task-dir examples/circle_packing \
+  --results_dir results/circle_codex_run \
+  --num_generations 20 \
+  --agent-backend codex
+```
+
 ### Namespaced overrides
 
 ```bash

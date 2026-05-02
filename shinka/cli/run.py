@@ -73,6 +73,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "  budget: --set evo.max_api_costs=0.5\n"
         "  models: --set "
         'evo.llm_models=\'["gpt-5-mini","gemini-3-flash-preview"]\'\n'
+        "  API-key-free agent model: --agent-backend codex "
+        "or --agent-backend claude-code\n"
         '  patching: --set evo.patch_types=\'["diff","full"]\' '
         "--set evo.patch_type_probs='[0.7,0.3]'\n"
         '  llm kwargs: --set evo.llm_kwargs=\'{"temperatures":[0.0,0.5,1.0],'
@@ -92,6 +94,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "  Minimal:\n"
         "    shinka_run --task-dir examples/circle_packing "
         "--results_dir results/circle_small --num_generations 20\n\n"
+        "  API-key-free through a logged-in agent CLI:\n"
+        "    shinka_run --task-dir examples/circle_packing "
+        "--results_dir results/circle_codex --num_generations 20 "
+        "--agent-backend codex\n\n"
         "  With overrides:\n"
         "    shinka_run --task-dir examples/circle_packing "
         "--results_dir results/circle_custom --num_generations 50 "
@@ -161,6 +167,26 @@ def _build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Optional YAML config loaded before --set. Relative paths resolve from --task-dir. Supports evo/db/job or evo_config/db_config/job_config.",
+    )
+    override_group.add_argument(
+        "--agent-backend",
+        choices=("claude-code", "codex"),
+        default=None,
+        help=(
+            "Use a logged-in local agent CLI as the mutation backend and disable "
+            "the default API-backed embedding model. Equivalent to setting "
+            "evo.llm_models plus evo.embedding_model=null. Also defaults "
+            "--max-proposal-jobs to 1 unless explicitly overridden."
+        ),
+    )
+    override_group.add_argument(
+        "--agent-model",
+        type=str,
+        default=None,
+        help=(
+            "Optional model passed to the selected agent CLI, e.g. "
+            "--agent-backend codex --agent-model gpt-5.4-mini."
+        ),
     )
 
     concurrency_group = parser.add_argument_group("concurrency")
@@ -375,6 +401,22 @@ def _build_default_evo_values(
     )
 
 
+def _build_agent_backend_evo_values(args: argparse.Namespace) -> Dict[str, Any]:
+    if args.agent_model and not args.agent_backend:
+        raise ValueError("--agent-model requires --agent-backend.")
+    if not args.agent_backend:
+        return {}
+
+    model_name = args.agent_backend
+    if args.agent_model:
+        model_name = f"{args.agent_backend}/{args.agent_model}"
+    return {
+        "llm_models": [model_name],
+        "llm_dynamic_selection": None,
+        "embedding_model": None,
+    }
+
+
 def _build_default_db_values() -> Dict[str, Any]:
     return asdict(DatabaseConfig())
 
@@ -448,6 +490,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             num_generations=args.num_generations,
         )
         evo_values.update(file_overrides["evo"])
+        evo_values.update(_build_agent_backend_evo_values(args))
         evo_values.update(parsed_overrides["evo"])
         evo_values["results_dir"] = str(results_dir)
         evo_values["num_generations"] = args.num_generations
@@ -464,6 +507,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             args.max_evaluation_jobs = runner_config.get("max_evaluation_jobs")
         if args.max_proposal_jobs is None:
             args.max_proposal_jobs = runner_config.get("max_proposal_jobs")
+        if args.max_proposal_jobs is None and args.agent_backend:
+            args.max_proposal_jobs = 1
         if args.max_db_workers is None:
             args.max_db_workers = runner_config.get("max_db_workers")
         args.verbose = _resolve_runner_bool(

@@ -75,6 +75,29 @@ def test_resolve_local_model_with_api_key_env_query_param():
     assert resolved.api_key_env_name == "CUSTOM_API_KEY"
 
 
+@pytest.mark.parametrize(
+    ("model_name", "provider", "agent_name", "cli_model_name"),
+    [
+        ("claude-code", "claude_code", "claude-code", None),
+        ("claude-code/sonnet", "claude_code", "claude-code", "sonnet"),
+        ("codex", "codex_cli", "codex", None),
+        ("codex/gpt-5.4-mini", "codex_cli", "codex", "gpt-5.4-mini"),
+    ],
+)
+def test_resolve_agent_cli_models(
+    model_name: str,
+    provider: str,
+    agent_name: str,
+    cli_model_name: str | None,
+):
+    resolved = resolve_model_backend(model_name)
+
+    assert resolved.provider == provider
+    assert resolved.agent_name == agent_name
+    assert resolved.cli_model_name == cli_model_name
+    assert resolved.api_model_name == model_name
+
+
 def test_resolve_azure_prefixed_model():
     resolved = resolve_model_backend("azure-gpt-4.1")
     assert resolved.provider == "azure_openai"

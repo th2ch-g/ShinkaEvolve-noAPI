@@ -148,6 +148,105 @@ def test_shinka_run_parses_json_overrides(tmp_path, monkeypatch):
     assert job_config.extra_cmd_args == {"seed": 42}
 
 
+def test_shinka_run_agent_backend_sets_api_free_defaults(tmp_path, monkeypatch):
+    _reset_dummy_runner()
+    task_dir = _make_task_dir(tmp_path)
+    results_dir = tmp_path / "results_agent"
+    monkeypatch.setattr(cli_run, "ShinkaEvolveRunner", _DummyRunner)
+
+    cli_run.main(
+        [
+            "--task-dir",
+            str(task_dir),
+            "--results_dir",
+            str(results_dir),
+            "--num_generations",
+            "3",
+            "--agent-backend",
+            "codex",
+        ]
+    )
+
+    evo_config = _DummyRunner.last_kwargs["evo_config"]
+    assert evo_config.llm_models == ["codex"]
+    assert evo_config.llm_dynamic_selection is None
+    assert evo_config.embedding_model is None
+    assert _DummyRunner.last_kwargs["max_proposal_jobs"] == 1
+
+
+def test_shinka_run_agent_model_extends_backend_model_id(tmp_path, monkeypatch):
+    _reset_dummy_runner()
+    task_dir = _make_task_dir(tmp_path)
+    results_dir = tmp_path / "results_agent_model"
+    monkeypatch.setattr(cli_run, "ShinkaEvolveRunner", _DummyRunner)
+
+    cli_run.main(
+        [
+            "--task-dir",
+            str(task_dir),
+            "--results_dir",
+            str(results_dir),
+            "--num_generations",
+            "3",
+            "--agent-backend",
+            "claude-code",
+            "--agent-model",
+            "sonnet",
+        ]
+    )
+
+    evo_config = _DummyRunner.last_kwargs["evo_config"]
+    assert evo_config.llm_models == ["claude-code/sonnet"]
+    assert evo_config.embedding_model is None
+    assert _DummyRunner.last_kwargs["max_proposal_jobs"] == 1
+
+
+def test_shinka_run_set_overrides_agent_backend_defaults(tmp_path, monkeypatch):
+    _reset_dummy_runner()
+    task_dir = _make_task_dir(tmp_path)
+    results_dir = tmp_path / "results_agent_override"
+    monkeypatch.setattr(cli_run, "ShinkaEvolveRunner", _DummyRunner)
+
+    cli_run.main(
+        [
+            "--task-dir",
+            str(task_dir),
+            "--results_dir",
+            str(results_dir),
+            "--num_generations",
+            "3",
+            "--agent-backend",
+            "codex",
+            "--set",
+            "evo.embedding_model=text-embedding-3-small",
+        ]
+    )
+
+    evo_config = _DummyRunner.last_kwargs["evo_config"]
+    assert evo_config.llm_models == ["codex"]
+    assert evo_config.embedding_model == "text-embedding-3-small"
+
+
+def test_shinka_run_agent_model_requires_agent_backend(tmp_path):
+    task_dir = _make_task_dir(tmp_path)
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_run.main(
+            [
+                "--task-dir",
+                str(task_dir),
+                "--results_dir",
+                str(tmp_path / "results"),
+                "--num_generations",
+                "3",
+                "--agent-model",
+                "gpt-5.4-mini",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+
+
 def test_shinka_run_parses_activate_script_override(tmp_path, monkeypatch):
     _reset_dummy_runner()
     task_dir = _make_task_dir(tmp_path)

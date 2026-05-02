@@ -46,11 +46,13 @@ Validate the exact run config against `shinka_models`:
 - Prompt evolution models: if `evo.evolve_prompts=true`, use `evo.prompt_llm_models` when provided, otherwise `evo.llm_models`; every selected model must appear in the `llm` list.
 - Embedding model: if `evo.embedding_model` is set, it must appear in the `embedding` list.
 - Local OpenAI-compatible models are allowed for LLMs and embeddings via `local/<model>@http(s)://host[:port]/v1`, and these local models are not expected to appear in `shinka_models`.
+- Agent CLI models are allowed via `codex`, `codex/<model>`, `claude-code`, or `claude-code/<model>`, and these models are not expected to appear in `shinka_models`.
 
 Important runtime rules:
 - Do not assume meta recommendations fall back to `evo.llm_models`. In the current runner, meta recommendations are only enabled when `evo.meta_llm_models` is explicitly set.
 - Prompt evolution does fall back to `evo.llm_models` when `evo.prompt_llm_models` is unset.
 - Treat `local/<model>@http(s)://host[:port]/v1` values as an explicit exception to the `shinka_models` membership check. Instead, confirm the local endpoint URL and serving status separately before running.
+- Treat agent CLI model values as an explicit exception to the `shinka_models` membership check. Instead, confirm `claude --version` or `codex --version` works and that the CLI is already logged in.
 - If any required model is missing from `shinka_models`, stop and ask the user to either change the config or set the missing credentials first.
 
 4. Confirm first-batch configuration with the user
@@ -77,6 +79,20 @@ shinka_run \
   --max-proposal-jobs 2 \
   --max-db-workers 2
 ```
+
+API-key-free run through a logged-in local agent CLI:
+```bash
+shinka_run \
+  --task-dir <task_dir> \
+  --results_dir <results_dir> \
+  --num_generations 20 \
+  --agent-backend codex \
+  --max-evaluation-jobs 2 \
+  --max-proposal-jobs 1 \
+  --max-db-workers 2
+```
+
+Use `--agent-backend claude-code` for Claude Code. Add `--agent-model <model>` only when the user asks for a specific CLI model. The agent preset disables the default API-backed embedding model and defaults proposal concurrency to one CLI invocation; if the user explicitly wants embeddings, set `evo.embedding_model` to a usable API or local embedding backend.
 
 6. Verify outputs before handoff
 ```bash

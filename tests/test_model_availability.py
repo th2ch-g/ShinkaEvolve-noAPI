@@ -58,6 +58,14 @@ def test_validate_model_env_access_allows_local_models_without_env_key(
     )
 
 
+def test_validate_model_env_access_allows_agent_cli_models_without_env_key(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _clear_provider_env(monkeypatch)
+
+    validate_model_env_access(llm_models=["codex", "claude-code/sonnet"])
+
+
 def test_validate_model_env_access_rejects_local_model_with_missing_key_env(
     monkeypatch: pytest.MonkeyPatch,
 ):

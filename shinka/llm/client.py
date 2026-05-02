@@ -7,6 +7,7 @@ from shinka.env import load_shinka_dotenv
 from shinka.google_genai import _google_genai_timeout_ms, build_google_genai_client
 from shinka.local_openai_config import resolve_local_openai_api_key
 from .constants import TIMEOUT
+from .providers.agent_cli import build_agent_cli_client
 from .providers.model_resolver import resolve_model_backend
 
 load_shinka_dotenv()
@@ -97,6 +98,10 @@ def get_client_llm(
             base_url=resolved.base_url,
             timeout=TIMEOUT,
         )
+    elif provider in ("claude_code", "codex_cli"):
+        if structured_output:
+            raise ValueError("Agent CLI backends do not support structured output.")
+        client = build_agent_cli_client(resolved)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 
@@ -177,6 +182,10 @@ def get_async_client_llm(
             base_url=resolved.base_url,
             timeout=TIMEOUT,
         )
+    elif provider in ("claude_code", "codex_cli"):
+        if structured_output:
+            raise ValueError("Agent CLI backends do not support structured output.")
+        client = build_agent_cli_client(resolved)
     else:
         raise ValueError(f"Model {model_name} not supported.")
 

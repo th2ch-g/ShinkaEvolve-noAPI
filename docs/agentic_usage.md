@@ -132,6 +132,22 @@ shinka_run \
   --num_generations 10
 ```
 
+API-key-free batch through a logged-in local agent CLI:
+
+```bash
+shinka_run \
+  --task-dir examples/my_task \
+  --results_dir results/my_task_codex \
+  --num_generations 10 \
+  --agent-backend codex
+```
+
+Use `--agent-backend claude-code` for Claude Code. Add `--agent-model <model>`
+when you want to pass an explicit model to the selected CLI. The preset sets
+`evo.llm_models` to the agent backend and disables the default API-backed
+embedding model. It also defaults proposal concurrency to one CLI invocation
+unless you explicitly pass `--max-proposal-jobs`.
+
 With core knobs via `--set`:
 
 ```bash
@@ -193,7 +209,8 @@ Before first run:
 
 - `shinka_run --help` works
 - task dir has `evaluate.py` + `initial.<ext>`
-- API keys are available in environment
+- API keys are available in environment, or use `--agent-backend codex` /
+  `--agent-backend claude-code` with the corresponding CLI already logged in
 - `npx skills list` shows the installed Shinka skills
 - for global installs, skills appear under `~/.claude/skills/` and/or `~/.codex/skills/`
 - for project installs, skills appear under `.claude/skills/` and/or `.agents/skills/`

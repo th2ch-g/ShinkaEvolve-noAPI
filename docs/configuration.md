@@ -35,7 +35,7 @@ Concurrency is configured on `ShinkaEvolveRunner`, not on `EvolutionConfig`.
 | `max_patch_attempts` | `int` | `1` | Max attempts to produce a syntactically valid patch. |
 | `job_type` | `str` | `'local'` | Job backend: `local`, `slurm_docker`, `slurm_conda`. |
 | `language` | `str` | `'python'` | Language tag for prompts + file handling. |
-| `llm_models` | `List[str]` | `['gpt-5-mini', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gpt-5.4']` | Mutation model pool. |
+| `llm_models` | `List[str]` | `['gpt-5-mini', 'gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gpt-5.4']` | Mutation model pool. Also accepts `codex[/<model>]` and `claude-code[/<model>]` for local agent CLI backends. |
 | `llm_dynamic_selection` | `Optional[Union[str, BanditBase]]` | `'ucb'` | Dynamic model selection (`fixed`, `ucb`, `ucb1`, `thompson`, or bandit object). |
 | `llm_dynamic_selection_kwargs` | `dict` | `{'cost_aware_coef': 0.5}` | kwargs forwarded to selected bandit. |
 | `llm_kwargs` | `dict` | `{'temperatures': [0.0, 0.5, 1.0], 'max_tokens': 16384}` | kwargs forwarded to LLM calls. |

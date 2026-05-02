@@ -164,7 +164,11 @@ def sample_model_kwargs(
                 "budget_tokens": thinking_tokens,
             }
 
-    # 4.d) SET: max_tokens for all other models
+    # 4.d) SET: max_tokens metadata for local agent CLI backends
+    elif provider in ("claude_code", "codex_cli"):
+        kwargs_dict["max_tokens"] = random.choice(max_tokens)
+
+    # 4.e) SET: max_tokens for all other models
     else:
         # Non-reasoning models or other providers
         if provider in ("anthropic", "bedrock", "deepseek", "local_openai"):

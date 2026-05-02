@@ -1,4 +1,4 @@
-# Local and OpenRouter Models
+# Local, OpenRouter, and Agent CLI Models
 
 Shinka supports dynamic LLM backend routing in `LLMClient` and `AsyncLLMClient`.
 It also supports dynamic embedding backend routing in `EmbeddingClient` and
@@ -8,6 +8,7 @@ You can use:
 - models listed in the provider pricing CSVs (existing behavior)
 - dynamic OpenRouter model IDs
 - local OpenAI-compatible servers via inline endpoint URIs
+- local Claude Code / Codex CLI backends
 
 ---
 
@@ -71,6 +72,56 @@ CUSTOM_API_KEY=...
 
 Shinka strips `api_key_env` from the runtime base URL before creating the client.
 
+### 4) Agent CLI backends
+
+Use a logged-in Claude Code or Codex CLI as the mutation LLM without provider API
+keys:
+
+```yaml
+evo_config:
+  llm_models:
+    - codex
+  embedding_model: null
+```
+
+```yaml
+evo_config:
+  llm_models:
+    - claude-code/sonnet
+  embedding_model: null
+```
+
+Supported model identifiers:
+
+- `codex`
+- `codex/<model>`
+- `claude-code`
+- `claude-code/<model>`
+
+The optional `<model>` is passed through to the CLI's model flag. These
+backends report token estimates and `0.0` cost because usage/cost metadata is
+not available from the local CLI invocation.
+
+For `shinka_run`, the convenience preset also disables the default OpenAI
+embedding model and defaults proposal concurrency to one CLI invocation at a
+time:
+
+```bash
+shinka_run \
+  --task-dir examples/circle_packing \
+  --results_dir results/circle_codex \
+  --num_generations 20 \
+  --agent-backend codex
+```
+
+Environment knobs:
+
+- `SHINKA_CLAUDE_CODE_COMMAND` (default: `claude`)
+- `SHINKA_CODEX_COMMAND` (default: `codex`)
+- `SHINKA_CLAUDE_CODE_ARGS` / `SHINKA_CODEX_ARGS` for extra CLI flags
+- `SHINKA_AGENT_CLI_TIMEOUT` in seconds (default: Shinka LLM timeout)
+- `SHINKA_AGENT_CLI_CWD` for the CLI working directory
+
 ---
 
 ## Local Embeddings
@@ -107,7 +158,7 @@ Common local embedding backends:
 - Local OpenAI-compatible backend path currently uses chat-completions style calls.
 - Local embedding backends use the OpenAI-compatible `/v1/embeddings` path.
 - `api_key_env` must reference a single environment variable name, for example `CUSTOM_API_KEY`.
-- Structured output is not supported yet for `local/...@...` models.
+- Structured output is not supported yet for `local/...@...` or agent CLI models.
 
 ---
 

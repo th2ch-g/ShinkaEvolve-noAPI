@@ -20,6 +20,8 @@ PROVIDER_ENV_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "anthropic": ("ANTHROPIC_API_KEY",),
     "azure": ("AZURE_OPENAI_API_KEY", "AZURE_API_ENDPOINT", "AZURE_API_VERSION"),
     "bedrock": ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION_NAME"),
+    "claude_code": (),
+    "codex_cli": (),
     "deepseek": ("DEEPSEEK_API_KEY",),
     "google": ("GEMINI_API_KEY",),
     "openai": ("OPENAI_API_KEY",),

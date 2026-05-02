@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from shinka.agent_cli_config import parse_agent_cli_model
 from shinka.local_openai_config import parse_local_openai_model
 from .pricing import get_provider
 
@@ -14,6 +15,8 @@ class ResolvedModel:
     provider: str
     base_url: Optional[str] = None
     api_key_env_name: Optional[str] = None
+    agent_name: Optional[str] = None
+    cli_model_name: Optional[str] = None
 
 
 def resolve_model_backend(model_name: str) -> ResolvedModel:
@@ -59,8 +62,20 @@ def resolve_model_backend(model_name: str) -> ResolvedModel:
             api_key_env_name=local_match.api_key_env_name,
         )
 
+    agent_match = parse_agent_cli_model(model_name)
+    if agent_match:
+        return ResolvedModel(
+            original_model_name=model_name,
+            api_model_name=agent_match.display_model_name,
+            provider=agent_match.provider,
+            base_url=None,
+            agent_name=agent_match.agent_name,
+            cli_model_name=agent_match.cli_model_name,
+        )
+
     raise ValueError(
         f"Model '{model_name}' is not supported. "
         "Use a known pricing.csv model, 'openrouter/<model>', "
-        "or 'local/<model>@http(s)://host[:port]/v1'."
+        "'local/<model>@http(s)://host[:port]/v1', "
+        "'claude-code[/<model>]', or 'codex[/<model>]'."
     )

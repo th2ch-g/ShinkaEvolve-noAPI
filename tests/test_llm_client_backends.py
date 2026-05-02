@@ -122,6 +122,34 @@ def test_get_client_llm_local_openai_uses_api_key_env_query_param(monkeypatch):
     assert captured_kwargs["api_key"] == "test-custom-key"
 
 
+def test_get_client_llm_codex_agent_backend(monkeypatch):
+    monkeypatch.setattr(
+        llm_client_module,
+        "build_agent_cli_client",
+        lambda resolved: {"agent": resolved.agent_name, "model": resolved.cli_model_name},
+    )
+
+    client, model_name, provider = get_client_llm("codex/gpt-5.4-mini")
+
+    assert provider == "codex_cli"
+    assert model_name == "codex/gpt-5.4-mini"
+    assert client == {"agent": "codex", "model": "gpt-5.4-mini"}
+
+
+def test_get_async_client_llm_claude_code_agent_backend(monkeypatch):
+    monkeypatch.setattr(
+        llm_client_module,
+        "build_agent_cli_client",
+        lambda resolved: {"agent": resolved.agent_name, "model": resolved.cli_model_name},
+    )
+
+    client, model_name, provider = get_async_client_llm("claude-code/sonnet")
+
+    assert provider == "claude_code"
+    assert model_name == "claude-code/sonnet"
+    assert client == {"agent": "claude-code", "model": "sonnet"}
+
+
 def test_get_async_client_llm_local_openai_missing_api_key_env_raises(monkeypatch):
     monkeypatch.delenv("CUSTOM_API_KEY", raising=False)
 

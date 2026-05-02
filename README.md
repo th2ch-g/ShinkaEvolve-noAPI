@@ -169,7 +169,7 @@ Class defaults below come from `shinka/core/config.py` (`EvolutionConfig`). Hydr
 | `max_patch_attempts` | `1` | `int` | Max attempts to generate a valid patch |
 | `job_type` | `"local"` | `str` | Job execution type: "local", "slurm_docker", "slurm_conda" |
 | `language` | `"python"` | `str` | Programming language for evolution |
-| `llm_models` | `["gpt-5-mini", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gpt-5.4"]` | `List[str]` | List of LLM models for code generation |
+| `llm_models` | `["gpt-5-mini", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gpt-5.4"]` | `List[str]` | List of LLM models for code generation. Also accepts `codex[/<model>]` and `claude-code[/<model>]` to route through logged-in local agent CLIs. |
 | `llm_dynamic_selection` | `"ucb"` | `Optional[Union[str, BanditBase]]` | Dynamic model selection strategy |
 | `llm_dynamic_selection_kwargs` | `{"cost_aware_coef": 0.5}` | `dict` | Kwargs for dynamic selection |
 | `llm_kwargs` | `{"temperatures": [0.0, 0.5, 1.0], "max_tokens": 16384}` | `dict` | Additional kwargs for LLM calls |
@@ -399,6 +399,13 @@ shinka_run \
     --task-dir examples/circle_packing \
     --results_dir results/circle_agent_run \
     --num_generations 20
+
+# API-key-free run through a logged-in Codex or Claude Code CLI
+shinka_run \
+    --task-dir examples/circle_packing \
+    --results_dir results/circle_codex_run \
+    --num_generations 20 \
+    --agent-backend codex
 
 # Run with keyword overrides
 shinka_run \

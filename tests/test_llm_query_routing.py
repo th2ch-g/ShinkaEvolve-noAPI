@@ -38,6 +38,45 @@ def test_query_routes_local_openai(monkeypatch):
     assert called["model"] == "local-model"
 
 
+def test_query_routes_agent_cli(monkeypatch):
+    monkeypatch.setattr(
+        query_module,
+        "get_client_llm",
+        lambda model_name, structured_output=False: (
+            "client",
+            "codex",
+            "codex_cli",
+        ),
+    )
+    called = {}
+
+    def _fake_agent_query(
+        client,
+        model,
+        msg,
+        system_msg,
+        msg_history,
+        output_model,
+        model_posteriors=None,
+        **kwargs,
+    ):
+        called["provider"] = "codex_cli"
+        called["model"] = model
+        return "ok-agent"
+
+    monkeypatch.setattr(query_module, "query_agent_cli", _fake_agent_query)
+
+    result = query_module.query(
+        model_name="codex",
+        msg="hello",
+        system_msg="sys",
+    )
+
+    assert result == "ok-agent"
+    assert called["provider"] == "codex_cli"
+    assert called["model"] == "codex"
+
+
 def test_query_async_routes_local_openai(monkeypatch):
     monkeypatch.setattr(
         query_module,
@@ -73,3 +112,44 @@ def test_query_async_routes_local_openai(monkeypatch):
     assert result == "ok-async"
     assert called["provider"] == "local_openai"
     assert called["model"] == "local-model"
+
+
+def test_query_async_routes_agent_cli(monkeypatch):
+    monkeypatch.setattr(
+        query_module,
+        "get_async_client_llm",
+        lambda model_name, structured_output=False: (
+            "client",
+            "claude-code",
+            "claude_code",
+        ),
+    )
+    called = {}
+
+    async def _fake_agent_query_async(
+        client,
+        model,
+        msg,
+        system_msg,
+        msg_history,
+        output_model,
+        model_posteriors=None,
+        **kwargs,
+    ):
+        called["provider"] = "claude_code"
+        called["model"] = model
+        return "ok-agent-async"
+
+    monkeypatch.setattr(query_module, "query_agent_cli_async", _fake_agent_query_async)
+
+    result = asyncio.run(
+        query_module.query_async(
+            model_name="claude-code",
+            msg="hello",
+            system_msg="sys",
+        )
+    )
+
+    assert result == "ok-agent-async"
+    assert called["provider"] == "claude_code"
+    assert called["model"] == "claude-code"
