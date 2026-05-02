@@ -407,6 +407,14 @@ shinka_run \
     --num_generations 20 \
     --agent-backend codex
 
+# Select Claude Code and pass a CLI model alias
+shinka_run \
+    --task-dir examples/circle_packing \
+    --results_dir results/circle_claude_run \
+    --num_generations 20 \
+    --agent-backend claude-code \
+    --agent-model sonnet
+
 # Run with keyword overrides
 shinka_run \
     --task-dir examples/circle_packing \
@@ -431,6 +439,15 @@ shinka_run \
 `--config-fname` can define `evo/db/job` (or `evo_config/db_config/job_config`) plus `max_evaluation_jobs/max_proposal_jobs/max_db_workers` and `verbose/debug`.  
 Precedence: config YAML < `--set` < authoritative flags.  
 `--results_dir` and `--num_generations` are authoritative and always override config/`--set` values for `evo.results_dir` and `evo.num_generations`.
+
+Agent CLI backends let you run proposal generation through an already logged-in
+Codex or Claude Code CLI instead of provider API keys. `--agent-backend codex`
+sets `evo.llm_models=["codex"]`; `--agent-backend claude-code --agent-model sonnet`
+sets `evo.llm_models=["claude-code/sonnet"]`. The preset also disables the
+default API-backed embedding model and defaults proposal concurrency to one CLI
+invocation unless `--max-proposal-jobs` is explicitly set. The same backends can
+be configured directly with `evo.llm_models` using `codex`, `codex/<model>`,
+`claude-code`, or `claude-code/<model>`.
 
 
 ## Interactive WebUI 🎨
