@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+import shinka.llm.llm as llm_module
 import shinka.llm.providers.agent_cli as agent_cli_module
+from shinka.llm import AsyncLLMClient
 from shinka.llm.providers.agent_cli import (
+    AgentCLITokenLimitError,
     AgentCLIClient,
     build_agent_cli_client,
     query_agent_cli,
@@ -130,3 +136,39 @@ def test_run_claude_code_uses_print_mode_and_system_prompt(monkeypatch, tmp_path
     assert "sonnet" in captured["args"]
     assert "--debug" in captured["args"]
 
+
+def test_raise_for_failure_detects_agent_cli_token_limit():
+    completed = subprocess.CompletedProcess(
+        ["codex"],
+        1,
+        stdout="",
+        stderr="usage limit reached for this account",
+    )
+
+    with pytest.raises(AgentCLITokenLimitError) as exc_info:
+        agent_cli_module._raise_for_failure(completed, agent_name="codex")
+
+    assert exc_info.value.agent_name == "codex"
+    assert exc_info.value.returncode == 1
+    assert "usage limit reached" in exc_info.value.details
+
+
+def test_async_llm_client_does_not_retry_agent_cli_token_limit(monkeypatch):
+    calls = 0
+
+    async def _fake_query_async(**kwargs):
+        nonlocal calls
+        calls += 1
+        raise AgentCLITokenLimitError(
+            agent_name="codex",
+            returncode=1,
+            details="usage limit reached",
+        )
+
+    monkeypatch.setattr(llm_module, "query_async", _fake_query_async)
+    client = AsyncLLMClient(model_names=["codex"], verbose=False)
+
+    with pytest.raises(AgentCLITokenLimitError):
+        asyncio.run(client.query(msg="mutate", system_msg="system"))
+
+    assert calls == 1

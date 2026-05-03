@@ -29,6 +29,7 @@ from shinka.database.prompt_dbase import (
     create_system_prompt,
 )
 from shinka.llm import (
+    AgentCLITokenLimitError,
     AsyncLLMClient,
     extract_between,
     BanditBase,
@@ -66,6 +67,8 @@ from shinka.utils import get_language_extension, parse_time_to_seconds
 from shinka.utils.languages import get_evolve_comment_prefix
 
 logger = logging.getLogger(__name__)
+
+AGENT_CLI_INTERRUPTION_STATE_FILENAME = "agent_cli_interruption_state.json"
 
 
 def _print_gradient_logo_and_mirror(
@@ -541,6 +544,9 @@ class ShinkaEvolveRunner:
         self.max_stuck_detections = 3  # Allow 3 stuck detections before giving up
         self.stuck_detection_timeout = 60.0  # 60 seconds without progress = stuck
         self.cost_limit_reached = False  # Track if we've hit the cost limit
+        self.agent_cli_token_limit_interrupted = False
+        self.agent_cli_token_limit_message: Optional[str] = None
+        self._agent_cli_interrupt_lock: Optional[asyncio.Lock] = None
 
         # Meta task logging state (to reduce verbosity)
         self._last_meta_log_state: dict | None = None
@@ -634,6 +640,216 @@ class ShinkaEvolveRunner:
                 generation,
                 e,
             )
+
+    def _agent_cli_interruption_state_path(self) -> Path:
+        return Path(self.results_dir) / AGENT_CLI_INTERRUPTION_STATE_FILENAME
+
+    async def _write_agent_cli_interruption_state(
+        self,
+        *,
+        exc: AgentCLITokenLimitError,
+        generation: Optional[int],
+    ) -> None:
+        """Persist why the run stopped so reruns can resume intentionally."""
+        payload = {
+            "status": "interrupted",
+            "reason": "agent_cli_token_limit",
+            "agent_name": exc.agent_name,
+            "returncode": exc.returncode,
+            "message": str(exc),
+            "details": exc.details,
+            "generation": generation,
+            "completed_generations": self.completed_generations,
+            "next_generation_to_submit": self.next_generation_to_submit,
+            "timestamp": datetime.now().isoformat(),
+        }
+        await write_file_async(
+            str(self._agent_cli_interruption_state_path()),
+            json.dumps(payload, indent=2, sort_keys=True),
+        )
+
+    async def _remove_generation_dir_for_resume(
+        self,
+        generation: int,
+        *,
+        reason: str,
+    ) -> None:
+        """Remove an unpersisted partial generation so the same gen can be retried."""
+        gen_dir = Path(self.results_dir) / f"{FOLDER_PREFIX}_{generation}"
+        if not gen_dir.exists():
+            return
+
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, shutil.rmtree, gen_dir)
+            logger.info(
+                "Removed partial generation directory %s after %s",
+                gen_dir,
+                reason,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to remove partial generation directory %s after %s: %s",
+                gen_dir,
+                reason,
+                e,
+            )
+
+    async def _cleanup_interrupted_generation_dirs_for_resume(self) -> None:
+        """Clean stale unpersisted generation directories from a prior interrupt."""
+        state_path = self._agent_cli_interruption_state_path()
+        if not state_path.exists():
+            return
+
+        try:
+            persisted_generations = set(
+                await self.async_db.get_persisted_generation_ids_async()
+            )
+        except Exception as e:
+            logger.warning(
+                "Could not inspect persisted generations for interrupt cleanup: %s",
+                e,
+            )
+            return
+
+        for gen_dir in Path(self.results_dir).glob(f"{FOLDER_PREFIX}_[0-9]*"):
+            suffix = gen_dir.name.removeprefix(f"{FOLDER_PREFIX}_")
+            if not suffix.isdigit():
+                continue
+            generation = int(suffix)
+            if generation in persisted_generations:
+                continue
+            await self._remove_generation_dir_for_resume(
+                generation,
+                reason="previous agent CLI token-limit interrupt",
+            )
+
+    async def _cancel_inflight_work_for_agent_cli_interrupt(
+        self,
+        *,
+        current_task: Optional[asyncio.Task],
+    ) -> None:
+        """Cancel in-flight work that cannot be safely persisted after interrupt."""
+        proposal_generations: Dict[asyncio.Task, int] = {}
+        proposal_tasks: List[asyncio.Task] = []
+        for task in list(self.active_proposal_tasks.values()):
+            if task is current_task or task.done():
+                continue
+            proposal_tasks.append(task)
+            task_name = task.get_name()
+            if task_name.startswith("proposal_"):
+                generation_text = task_name.split("_", 1)[1]
+                if generation_text.isdigit():
+                    proposal_generations[task] = int(generation_text)
+
+        if proposal_tasks:
+            logger.info(
+                "Cancelling %s active proposal task(s) after agent CLI token limit",
+                len(proposal_tasks),
+            )
+            for task in proposal_tasks:
+                task.cancel()
+            await asyncio.gather(*proposal_tasks, return_exceptions=True)
+            for task_id, task in list(self.active_proposal_tasks.items()):
+                if task in proposal_tasks:
+                    self.active_proposal_tasks.pop(task_id, None)
+            for generation in proposal_generations.values():
+                await self._remove_generation_dir_for_resume(
+                    generation,
+                    reason="agent CLI token-limit interrupt",
+                )
+
+        cancelled_jobs: List[AsyncRunningJob] = []
+        surviving_jobs: List[AsyncRunningJob] = []
+        for job in list(self.running_jobs):
+            try:
+                cancelled = await self.scheduler.cancel_job_async(job.job_id)
+            except Exception as e:
+                logger.warning(
+                    "Failed to cancel job %s (gen %s) after agent CLI token limit: %s",
+                    job.job_id,
+                    job.generation,
+                    e,
+                )
+                cancelled = False
+
+            if cancelled:
+                cancelled_jobs.append(job)
+                self.submitted_jobs.pop(str(job.job_id), None)
+                await self._release_evaluation_slot_once(job)
+                await self._remove_generation_dir_for_resume(
+                    job.generation,
+                    reason="agent CLI token-limit interrupt",
+                )
+            else:
+                surviving_jobs.append(job)
+
+        self.running_jobs = surviving_jobs
+        if cancelled_jobs:
+            logger.info(
+                "Cancelled %s running evaluation job(s) after agent CLI token limit: gens %s",
+                len(cancelled_jobs),
+                [job.generation for job in cancelled_jobs],
+            )
+
+        remaining_task_generations = {
+            int(task.get_name().split("_", 1)[1])
+            for task in self.active_proposal_tasks.values()
+            if task.get_name().startswith("proposal_")
+            and task.get_name().split("_", 1)[1].isdigit()
+        }
+        self.assigned_generations = {
+            job.generation for job in self.running_jobs
+        } | remaining_task_generations
+
+    async def _handle_agent_cli_token_limit_interrupt(
+        self,
+        exc: AgentCLITokenLimitError,
+        *,
+        generation: Optional[int] = None,
+    ) -> None:
+        """Stop the run on local agent CLI token/quota exhaustion."""
+        lock = getattr(self, "_agent_cli_interrupt_lock", None)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._agent_cli_interrupt_lock = lock
+
+        async with lock:
+            if getattr(self, "agent_cli_token_limit_interrupted", False):
+                return
+
+            self.agent_cli_token_limit_interrupted = True
+            self.agent_cli_token_limit_message = str(exc)
+            logger.warning(
+                "Agent CLI token/usage limit reached; interrupting evolution. %s",
+                exc,
+            )
+            await self._write_agent_cli_interruption_state(
+                exc=exc,
+                generation=generation,
+            )
+            await self._record_generation_event(
+                generation=(
+                    generation
+                    if generation is not None
+                    else self.next_generation_to_submit
+                ),
+                status="agent_cli_token_limit_interrupted",
+                details={
+                    "reason": "agent_cli_token_limit",
+                    "agent_name": exc.agent_name,
+                    "returncode": exc.returncode,
+                    "message": str(exc),
+                    "details": exc.details,
+                },
+            )
+
+            self.should_stop.set()
+            self.slot_available.set()
+            await self._cancel_inflight_work_for_agent_cli_interrupt(
+                current_task=asyncio.current_task()
+            )
+            self.finalization_complete.set()
 
     def _validate_concurrency_settings(
         self,
@@ -1000,9 +1216,14 @@ class ShinkaEvolveRunner:
                 logger.info(
                     "🔄 Performing final embedding recomputation and meta summary..."
                 )
+                if self.agent_cli_token_limit_interrupted:
+                    logger.info(
+                        "Skipping final embedding/meta operations after agent CLI "
+                        "token-limit interrupt."
+                    )
 
             # Force final embedding recomputation before shutdown
-            if self.embedding_client:
+            if self.embedding_client and not self.agent_cli_token_limit_interrupted:
                 try:
                     if self.verbose:
                         logger.info("Starting final PCA/embedding recomputation...")
@@ -1039,7 +1260,7 @@ class ShinkaEvolveRunner:
                     )
 
             # Perform final meta summary for any remaining unprocessed programs
-            if self.meta_summarizer:
+            if self.meta_summarizer and not self.agent_cli_token_limit_interrupted:
                 try:
                     if self.verbose:
                         logger.info("Starting final meta summary generation...")
@@ -1095,6 +1316,8 @@ class ShinkaEvolveRunner:
                     "🏁 All final operations completed, proceeding to cleanup..."
                 )
 
+        except AgentCLITokenLimitError as e:
+            await self._handle_agent_cli_token_limit_interrupt(e)
         except Exception as e:
             logger.error(f"Error in async evolution run: {e}")
             raise
@@ -1157,6 +1380,7 @@ class ShinkaEvolveRunner:
 
             # Update state for resuming
             await self._restore_resume_progress()
+            await self._cleanup_interrupted_generation_dirs_for_resume()
         else:
             # Generate or copy initial program only if NOT resuming
             if (
@@ -2581,6 +2805,16 @@ class ShinkaEvolveRunner:
                 active_proposals_at_start,
             )
 
+        except AgentCLITokenLimitError as e:
+            await self._handle_agent_cli_token_limit_interrupt(
+                e,
+                generation=generation,
+            )
+            await self._remove_generation_dir_for_resume(
+                generation,
+                reason="agent CLI token-limit interrupt",
+            )
+            return None
         except Exception as e:
             logger.error(f"Error generating proposal for generation {generation}: {e}")
             return None
@@ -2725,6 +2959,8 @@ class ShinkaEvolveRunner:
                     # We have a successful patch, break from resample loop
                     meta_patch_data["api_costs"] = api_costs
                     break
+                except AgentCLITokenLimitError:
+                    raise
                 except Exception as e:
                     logger.warning(
                         f"Error in patch generation attempt {resample + 1}: {e}"
@@ -3503,6 +3739,8 @@ class ShinkaEvolveRunner:
 
             return None, meta_patch_data, False
 
+        except AgentCLITokenLimitError:
+            raise
         except Exception as e:
             logger.error(f"Error in fix patch async: {e}")
             return None, {"api_costs": 0.0, "error_attempt": str(e)}, False
@@ -3735,6 +3973,10 @@ class ShinkaEvolveRunner:
 
             return None, meta_patch_data, False
 
+        except AgentCLITokenLimitError:
+            # Restore original task_sys_msg in case of exception
+            self.prompt_sampler.task_sys_msg = original_task_sys_msg
+            raise
         except Exception as e:
             logger.error(f"Error in async patch generation: {e}")
             # Restore original task_sys_msg in case of exception
@@ -5457,10 +5699,17 @@ class ShinkaEvolveRunner:
         missing_generations = (
             self._get_generations_without_program_due_to_proposal_failure()
         )
+        interrupted = getattr(self, "agent_cli_token_limit_interrupted", False)
 
         logger.info("=" * 80)
-        logger.info("ASYNC EVOLUTION COMPLETED")
+        logger.info(
+            "ASYNC EVOLUTION INTERRUPTED"
+            if interrupted
+            else "ASYNC EVOLUTION COMPLETED"
+        )
         logger.info("=" * 80)
+        if interrupted:
+            logger.info("Interrupt reason: %s", self.agent_cli_token_limit_message)
         logger.info(f"Target generations: {self.evo_config.num_generations}")
         logger.info(f"Stored programs: {self.completed_generations}")
         logger.info(

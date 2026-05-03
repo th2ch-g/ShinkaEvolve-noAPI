@@ -6,11 +6,13 @@ from types import SimpleNamespace
 import pytest
 
 from shinka.core.async_runner import (
+    AGENT_CLI_INTERRUPTION_STATE_FILENAME,
     AsyncRunningJob,
     CompletedJobPersistResult,
     PersistedProgramEvent,
     ShinkaEvolveRunner,
 )
+from shinka.llm.providers.agent_cli import AgentCLITokenLimitError
 from shinka.core.runtime_slots import LogicalSlotPool
 
 
@@ -712,6 +714,62 @@ def test_cleanup_proposal_task_state_releases_generation_and_slot():
         assert runner.assigned_generations == set()
         assert runner.active_proposal_tasks == {}
         assert slot_pool.released == []
+
+    asyncio.run(_run())
+
+
+def test_generate_proposal_interrupts_and_cleans_partial_dir_on_agent_cli_token_limit(
+    tmp_path,
+):
+    async def _run():
+        runner = _build_runner(results_dir=str(tmp_path), lang_ext="py")
+        runner.total_proposals_generated = 0
+
+        async def _raise_token_limit(*args, **kwargs):
+            raise AgentCLITokenLimitError(
+                agent_name="codex",
+                returncode=1,
+                details="usage limit reached",
+            )
+
+        runner._generate_evolved_proposal = _raise_token_limit
+
+        result = await runner._generate_proposal_async(generation=3, task_id="task-3")
+
+        assert result is None
+        assert runner.should_stop.is_set()
+        assert runner.finalization_complete.is_set()
+        assert not (tmp_path / "gen_3").exists()
+
+        state_path = tmp_path / AGENT_CLI_INTERRUPTION_STATE_FILENAME
+        payload = json.loads(state_path.read_text())
+        assert payload["reason"] == "agent_cli_token_limit"
+        assert payload["agent_name"] == "codex"
+        assert payload["generation"] == 3
+
+    asyncio.run(_run())
+
+
+def test_cleanup_interrupted_generation_dirs_for_resume_keeps_persisted_dirs(tmp_path):
+    class _FakeAsyncDBWithPersisted:
+        async def get_persisted_generation_ids_async(self):
+            return [0, 2]
+
+    async def _run():
+        (tmp_path / AGENT_CLI_INTERRUPTION_STATE_FILENAME).write_text("{}")
+        (tmp_path / "gen_1").mkdir()
+        (tmp_path / "gen_2").mkdir()
+        (tmp_path / "gen_2" / "main.py").write_text("print('persisted')")
+
+        runner = _build_runner(
+            async_db=_FakeAsyncDBWithPersisted(),
+            results_dir=str(tmp_path),
+        )
+
+        await runner._cleanup_interrupted_generation_dirs_for_resume()
+
+        assert not (tmp_path / "gen_1").exists()
+        assert (tmp_path / "gen_2").exists()
 
     asyncio.run(_run())
 

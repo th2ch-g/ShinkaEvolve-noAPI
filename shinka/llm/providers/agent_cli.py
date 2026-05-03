@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -21,6 +22,48 @@ from .result import QueryResult
 logger = logging.getLogger(__name__)
 
 _MAX_ERROR_CHARS = 4000
+_TOKEN_LIMIT_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\btoken(?:s)?\s+(?:limit|quota|budget)\b",
+        r"\b(?:limit|quota|budget)\s+(?:for\s+)?token(?:s)?\b",
+        r"\btoken(?:s)?.*(?:reached|exceed(?:s|ed|ing)?)\b",
+        r"\b(?:reached|exceed(?:s|ed|ing)?).*token(?:s)?\b",
+        r"\btoo many tokens\b",
+        r"\bmaximum context length\b",
+        r"\bcontext (?:length|window|limit)\b",
+        r"\bcontext .* exceeded\b",
+        r"\bexceed(?:s|ed|ing)? .* context\b",
+        r"\busage limit (?:reached|exceeded)\b",
+        r"\bquota (?:reached|exceeded)\b",
+        r"\brate limit (?:reached|exceeded)\b",
+        r"\bbilling .* limit\b",
+    )
+)
+
+
+class AgentCLITokenLimitError(RuntimeError):
+    """Raised when a local agent CLI reports an account/context token limit."""
+
+    def __init__(
+        self,
+        agent_name: str,
+        returncode: int,
+        details: str,
+    ) -> None:
+        self.agent_name = agent_name
+        self.returncode = returncode
+        self.details = details
+        super().__init__(
+            f"{agent_name} CLI token or usage limit reached "
+            f"(exit code {returncode}): {details}"
+        )
+
+    def __reduce__(self):
+        return (
+            self.__class__,
+            (self.agent_name, self.returncode, self.details),
+        )
 
 
 @dataclass(frozen=True)
@@ -128,6 +171,10 @@ def _truncate(text: str) -> str:
     return text[:_MAX_ERROR_CHARS] + "\n...[truncated]"
 
 
+def _looks_like_token_limit(details: str) -> bool:
+    return any(pattern.search(details) for pattern in _TOKEN_LIMIT_PATTERNS)
+
+
 def _run_process(
     args: list[str],
     *,
@@ -157,6 +204,13 @@ def _raise_for_failure(
     stdout = _truncate(completed.stdout.strip())
     stderr = _truncate(completed.stderr.strip())
     details = stderr or stdout or "no output"
+    combined_output = "\n".join(part for part in [stderr, stdout] if part)
+    if _looks_like_token_limit(combined_output or details):
+        raise AgentCLITokenLimitError(
+            agent_name=agent_name,
+            returncode=completed.returncode,
+            details=details,
+        )
     raise RuntimeError(
         f"{agent_name} CLI query failed with exit code "
         f"{completed.returncode}: {details}"

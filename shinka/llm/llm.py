@@ -8,11 +8,15 @@ from pydantic import BaseModel
 import time
 from .query import query, query_async
 from .kwargs import sample_model_kwargs
-from .providers import QueryResult
+from .providers import AgentCLITokenLimitError, QueryResult
 
 MAX_RETRIES = 3
 
 logger = logging.getLogger(__name__)
+
+
+def _is_non_retryable_llm_error(exc: Exception) -> bool:
+    return isinstance(exc, AgentCLITokenLimitError)
 
 
 class LLMClient:
@@ -90,6 +94,8 @@ class LLMClient:
                     idx, result = async_result.get()
                     results.append((idx, result))
                 except Exception as e:
+                    if _is_non_retryable_llm_error(e):
+                        raise
                     logger.error(f"Error in batch query: {str(e)}")
 
             # Sort by index and extract just the results
@@ -184,6 +190,8 @@ class LLMClient:
                     idx, result = async_result.get()
                     results.append((idx, result))
                 except Exception as e:
+                    if _is_non_retryable_llm_error(e):
+                        raise
                     logger.error(f"Error in batch query: {str(e)}")
 
             # Sort by index and extract just the results
@@ -305,6 +313,8 @@ class LLMClient:
                     logger.info(f"==> QUERY: API cost: ${result.cost:.4f}")
                 return result
             except Exception as e:
+                if _is_non_retryable_llm_error(e):
+                    raise
                 logger.error(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
                 try_count += 1
         return None
@@ -377,6 +387,8 @@ class AsyncLLMClient:
         final_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                if _is_non_retryable_llm_error(result):
+                    raise result
                 logger.info(f"Error in batch query task {i}: {str(result)}")
             elif result is not None and len(result) > 1 and result[1] is not None:
                 final_results.append(result[1])
@@ -458,6 +470,8 @@ class AsyncLLMClient:
         final_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                if _is_non_retryable_llm_error(result):
+                    raise result
                 logger.info(f"Error in batch query task {i}: {str(result)}")
             elif result is not None and len(result) > 1 and result[1] is not None:
                 final_results.append(result[1])
@@ -577,6 +591,8 @@ class AsyncLLMClient:
                     logger.info(f"==> QUERY: API cost: ${result.cost:.4f}")
                 return result
             except Exception as e:
+                if _is_non_retryable_llm_error(e):
+                    raise
                 logger.info(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
                 try_count += 1
                 if try_count < MAX_RETRIES:
@@ -608,6 +624,8 @@ class AsyncLLMClient:
                 )
                 return idx, result
             except Exception as e:
+                if _is_non_retryable_llm_error(e):
+                    raise
                 logger.info(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
                 try_count += 1
                 if try_count == MAX_RETRIES:
@@ -655,6 +673,8 @@ class AsyncLLMClient:
                 )
                 return idx, result
             except Exception as e:
+                if _is_non_retryable_llm_error(e):
+                    raise
                 logger.info(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
                 try_count += 1
                 if try_count == MAX_RETRIES:
@@ -688,6 +708,8 @@ def query_fn(
             )
             return idx, result
         except Exception as e:
+            if _is_non_retryable_llm_error(e):
+                raise
             logger.error(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
             try_count += 1
             if try_count == MAX_RETRIES:
@@ -741,6 +763,8 @@ def sample_kwargs_query_fn(
             )
             return idx, result
         except Exception as e:
+            if _is_non_retryable_llm_error(e):
+                raise
             logger.error(f"{try_count + 1}/{MAX_RETRIES} Error in query: {str(e)}")
             try_count += 1
             if try_count == MAX_RETRIES:

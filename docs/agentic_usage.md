@@ -150,6 +150,12 @@ when you want to pass an explicit model to the selected CLI. The preset sets
 embedding model. It also defaults proposal concurrency to one CLI invocation
 unless you explicitly pass `--max-proposal-jobs`.
 
+When the selected agent CLI reports a token, context, usage, or quota limit
+during mutation generation, Shinka stops the run and writes
+`agent_cli_interruption_state.json` under `results_dir`. Re-run the same command
+with the same `results_dir` after the CLI is usable again to resume from the
+last persisted program.
+
 With core knobs via `--set`:
 
 ```bash

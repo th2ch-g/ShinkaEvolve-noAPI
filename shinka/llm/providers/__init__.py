@@ -1,4 +1,4 @@
-from .agent_cli import query_agent_cli, query_agent_cli_async
+from .agent_cli import AgentCLITokenLimitError, query_agent_cli, query_agent_cli_async
 from .anthropic import query_anthropic, query_anthropic_async
 from .openai import query_openai, query_openai_async
 from .deepseek import query_deepseek, query_deepseek_async
@@ -20,4 +20,5 @@ __all__ = [
     "query_gemini_async",
     "query_local_openai_async",
     "QueryResult",
+    "AgentCLITokenLimitError",
 ]

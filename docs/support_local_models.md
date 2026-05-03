@@ -102,6 +102,12 @@ The optional `<model>` is passed through to the CLI's model flag. These
 backends report token estimates and `0.0` cost because usage/cost metadata is
 not available from the local CLI invocation.
 
+If Claude Code or Codex reports a token, context, usage, or quota limit while
+generating a mutation, Shinka interrupts the run instead of retrying the same
+failed request. It writes `agent_cli_interruption_state.json` in the results
+directory, removes unpersisted partial generation directories, and the same
+`results_dir` can be passed again to resume from the last persisted program.
+
 For `shinka_run`, the convenience preset also disables the default OpenAI
 embedding model and defaults proposal concurrency to one CLI invocation at a
 time:

@@ -1,5 +1,5 @@
 from .llm import LLMClient, AsyncLLMClient, extract_between
-from .providers import QueryResult
+from .providers import AgentCLITokenLimitError, QueryResult
 from .prioritization import (
     BanditBase,
     AsymmetricUCB,
@@ -12,6 +12,7 @@ __all__ = [
     "AsyncLLMClient",
     "extract_between",
     "QueryResult",
+    "AgentCLITokenLimitError",
     "EmbeddingClient",
     "AsyncEmbeddingClient",
     "BanditBase",
