@@ -264,6 +264,8 @@ def _run_codex(client: AgentCLIClient, prompt: str) -> str:
             "never",
             "--skip-git-repo-check",
             "--ephemeral",
+            "--ignore-user-config",
+            "--ignore-rules",
             "--color",
             "never",
             "--output-last-message",

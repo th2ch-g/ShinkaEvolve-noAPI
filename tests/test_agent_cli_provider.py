@@ -83,7 +83,7 @@ def test_run_codex_reads_last_message_file(monkeypatch, tmp_path):
         agent_name="codex",
         cli_model_name="gpt-5.4-mini",
         command_parts=("codex",),
-        extra_args=("--ignore-rules",),
+        extra_args=("--debug",),
         timeout=1200,
         cwd=str(tmp_path),
     )
@@ -102,6 +102,8 @@ def test_run_codex_reads_last_message_file(monkeypatch, tmp_path):
     assert captured["args"][:2] == ["codex", "exec"]
     assert "--model" in captured["args"]
     assert "gpt-5.4-mini" in captured["args"]
+    assert "--debug" in captured["args"]
+    assert "--ignore-user-config" in captured["args"]
     assert "--ignore-rules" in captured["args"]
     assert captured["args"][-1] == "-"
 
