@@ -260,8 +260,6 @@ def _run_codex(client: AgentCLIClient, prompt: str) -> str:
             client.cwd,
             "--sandbox",
             "read-only",
-            "--ask-for-approval",
-            "never",
             "--skip-git-repo-check",
             "--ephemeral",
             "--ignore-user-config",
